@@ -5,6 +5,8 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("loginForm").addEventListener("submit",handleLogin);
   document.getElementById("signupForm").addEventListener("submit",handleSignup);
   document.getElementById("instantForm").addEventListener("submit",handleInstant);
+  document.getElementById("signupRole")?.addEventListener("change",toggleTechnicianFields);
+  toggleTechnicianFields();
 });
 
 function scrollToId(id){document.getElementById(id)?.scrollIntoView({behavior:"smooth"});}
@@ -84,27 +86,114 @@ function acceptMembershipTerms(){
   state.membership={...state.pendingMembership,termsAccepted:true,termsAcceptedAt:new Date().toISOString()};
   localStorage.setItem("surakshaCareMembership",JSON.stringify(state.membership));
   localStorage.setItem("surakshaCareTermsConsent",JSON.stringify({accepted:true,plan:state.membership.plan,acceptedAt:state.membership.termsAcceptedAt}));
+  syncMembershipToDatabase();
   const selected=state.membership.plan;
   state.pendingMembership=null;
   closeModal("termsModal");
   toast(`${selected} membership terms accepted. Continue with account setup.`);
   setTimeout(()=>openModal("signupModal"),450);
 }
-function handleSignup(e){
+function toggleTechnicianFields(){
+  const role=document.getElementById("signupRole")?.value;
+  const box=document.getElementById("technicianFields");
+  if(box) box.style.display=role==="technician"?"block":"none";
+}
+function databaseReady(){return !!(window.surakshaSupabaseReady && window.surakshaSupabase);}
+async function handleSignup(e){
   e.preventDefault();
-  const name=document.getElementById("signupName").value.trim(),email=document.getElementById("signupEmail").value.trim(),mobile=document.getElementById("signupMobile").value.trim();
+  const name=document.getElementById("signupName").value.trim();
+  const email=document.getElementById("signupEmail").value.trim().toLowerCase();
+  const mobile=document.getElementById("signupMobile").value.trim();
+  const password=document.getElementById("signupPassword").value;
+  const role=(document.getElementById("signupRole")?.value||"customer").toLowerCase();
+  const skills=document.getElementById("signupSkills")?.value.trim()||"";
   if(!/^\d{10}$/.test(mobile)){toast("Please enter a valid 10-digit mobile number.");return;}
-  localStorage.setItem("surakshaCareUser",JSON.stringify({name,email,mobile,createdAt:new Date().toISOString()}));
-  closeModal("signupModal");toast("Account created successfully. Dashboard demo is ready.");
-  setTimeout(()=>openModal("loginModal"),600);
+  if(password.length<6){toast("Password must be at least 6 characters.");return;}
+
+  if(!databaseReady()){
+    localStorage.setItem("surakshaCareUser",JSON.stringify({name,email,mobile,role,skills,createdAt:new Date().toISOString()}));
+    localStorage.setItem("surakshaCareRole",role==="technician"?"Technician":"Customer");
+    closeModal("signupModal");toast("Demo account created. Connect Supabase to store accounts online.");
+    setTimeout(()=>openModal("loginModal"),600);return;
+  }
+
+  const {data,error}=await window.surakshaSupabase.auth.signUp({
+    email,password,
+    options:{data:{full_name:name,mobile,role,skills}}
+  });
+  if(error){toast(error.message||"Account creation failed.");return;}
+  localStorage.setItem("surakshaCareUser",JSON.stringify({name,email,mobile,role,skills,createdAt:new Date().toISOString()}));
+  localStorage.setItem("surakshaCareRole",role==="technician"?"Technician":"Customer");
+  closeModal("signupModal");
+  if(data.session){
+    toast("Account created and signed in successfully.");
+    setTimeout(()=>role==="technician"?showTechnicianDashboard():showCustomerDashboard(),500);
+  }else{
+    toast("Account created. Please verify your email, then log in.");
+    setTimeout(()=>openModal("loginModal"),700);
+  }
 }
-function handleLogin(e){
+async function handleLogin(e){
   e.preventDefault();
-  const role=document.getElementById("loginRole").value;
-  localStorage.setItem("surakshaCareRole",role);
+  const email=document.getElementById("loginEmail").value.trim().toLowerCase();
+  const password=document.getElementById("loginPassword").value;
+  const selectedRole=document.getElementById("loginRole").value;
+
+  if(!databaseReady()){
+    toast("Supabase is not connected yet. Use the setup guide to connect real accounts.");return;
+  }
+  const {data,error}=await window.surakshaSupabase.auth.signInWithPassword({email,password});
+  if(error){toast(error.message||"Login failed.");return;}
+  const user=data.user;
+  const meta=user.user_metadata||{};
+  let profile=null;
+  const result=await window.surakshaSupabase.from("profiles").select("*").eq("id",user.id).maybeSingle();
+  if(!result.error) profile=result.data;
+  const actualRole=(profile?.role||meta.role||"customer").toLowerCase();
+  const actualLabel=actualRole==="technician"?"Technician":"Customer";
+  if(actualLabel!==selectedRole){
+    await window.surakshaSupabase.auth.signOut();
+    toast("This account is registered as a "+actualLabel+" account. Select the correct role.");return;
+  }
+  const userRecord={
+    id:user.id,name:profile?.full_name||meta.full_name||"",email:user.email||email,
+    mobile:profile?.mobile||meta.mobile||"",role:actualRole,skills:profile?.skills||meta.skills||""
+  };
+  localStorage.setItem("surakshaCareUser",JSON.stringify(userRecord));
+  localStorage.setItem("surakshaCareRole",actualLabel);
   closeModal("loginModal");
-  if(role==="Customer")showCustomerDashboard();else if(role==="Technician")showTechnicianDashboard();else showAdminDashboard();
+  toast("Welcome back, "+(userRecord.name||actualLabel)+"!");
+  setTimeout(()=>actualRole==="technician"?showTechnicianDashboard():showCustomerDashboard(),350);
 }
+function currentAuthUser(){return window.surakshaSupabaseReady?window.surakshaSupabase.auth.getUser():Promise.resolve({data:{user:null}});}
+async function saveCurrentProfileData(){
+  if(!databaseReady()) return;
+  const {data}=await window.surakshaSupabase.auth.getUser();
+  if(!data?.user) return;
+  const u=JSON.parse(localStorage.getItem("surakshaCareUser")||"{}");
+  await window.surakshaSupabase.from("profiles").upsert({id:data.user.id,full_name:u.name||null,mobile:u.mobile||null,role:u.role||"customer",skills:u.skills||null},{onConflict:"id"});
+}
+async function syncDevicesToDatabase(){
+  if(!databaseReady()) return;
+  const {data}=await window.surakshaSupabase.auth.getUser(); if(!data?.user) return;
+  const devices=state.devices.filter(d=>d.category&&d.product&&Number(d.value)>0);
+  for(const d of devices){
+    await window.surakshaSupabase.from("devices").insert({user_id:data.user.id,category:d.category,product:d.product,approx_value:Number(d.value)||0});
+  }
+}
+
+async function syncMembershipToDatabase(){
+  if(!databaseReady()) return;
+  const {data}=await window.surakshaSupabase.auth.getUser(); if(!data?.user || !state.membership) return;
+  await window.surakshaSupabase.from("memberships").insert({user_id:data.user.id,plan:state.membership.plan,price:Number(state.membership.price)||0,checkups:Number(state.membership.checkups)||0,terms_accepted_at:state.membership.termsAcceptedAt,status:"active"});
+  await syncDevicesToDatabase();
+}
+async function syncServiceRequestToDatabase(data){
+  if(!databaseReady()) return;
+  const {data:auth}=await window.surakshaSupabase.auth.getUser(); if(!auth?.user) return;
+  await window.surakshaSupabase.from("service_requests").insert({user_id:auth.user.id,request_code:data.id,type:data.type,device:data.device,problem:data.problem,priority:data.priority,location:data.location,preferred_time:data.preferredTime||null,status:data.status});
+}
+
 function handleInstant(e){
   e.preventDefault();
   const data={type:document.getElementById("instantType").value,device:document.getElementById("instantDevice").value,problem:document.getElementById("instantProblem").value,location:document.getElementById("instantLocation").value,id:"SC-FAST-"+String(Date.now()).slice(-6),status:"Technician requested"};
@@ -142,6 +231,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     const usage=document.getElementById("healthUsage").value;
     const issues=document.getElementById("healthIssues").value;
     localStorage.setItem("surakshaCareHealth",JSON.stringify({device,score,usage,issues,date:new Date().toISOString()}));
+    syncHealthToDatabase({device,score,usage,issues});
     document.getElementById("healthScore").textContent=score+"%";
     document.getElementById("healthDeviceName").textContent=device;
     document.getElementById("healthAdvice").textContent=score>=85?"Good condition. Continue preventive maintenance.":score>=65?"Needs attention. Consider a preventive checkup soon.":"High attention recommended. Schedule technician support soon.";
@@ -152,6 +242,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     e.preventDefault();
     const complaint={type:document.getElementById("complaintType").value,message:document.getElementById("complaintMessage").value,id:"SC-CMP-"+String(Date.now()).slice(-6),date:new Date().toISOString()};
     localStorage.setItem("surakshaCareComplaint",JSON.stringify(complaint));
+    syncComplaintToDatabase(complaint);
     closeModal("complaintModal");toast("Complaint submitted: "+complaint.id);
   });
   document.getElementById("reviewForm")?.addEventListener("submit",e=>{
@@ -160,22 +251,40 @@ document.addEventListener("DOMContentLoaded",()=>{
     const review={name:document.getElementById("reviewName").value.trim(),serviceId:document.getElementById("reviewServiceId").value.trim(),rating:Number(document.getElementById("reviewRating").value),comment:document.getElementById("reviewComment").value.trim(),date:new Date().toISOString()};
     reviews.push(review);
     localStorage.setItem("surakshaCareReviews",JSON.stringify(reviews));
+    syncReviewToDatabase(review);
     e.target.reset(); closeModal("reviewModal"); renderReviews(); toast("Thanks! Your customer review was added.");
   });
 });
+
+async function syncHealthToDatabase(h){
+  if(!databaseReady()) return;
+  const {data}=await window.surakshaSupabase.auth.getUser(); if(!data?.user) return;
+  await window.surakshaSupabase.from("health_assessments").insert({user_id:data.user.id,device:h.device,score:h.score,usage:h.usage,previous_issues:h.issues});
+}
+async function syncComplaintToDatabase(c){
+  if(!databaseReady()) return;
+  const {data}=await window.surakshaSupabase.auth.getUser(); if(!data?.user) return;
+  await window.surakshaSupabase.from("complaints").insert({user_id:data.user.id,complaint_code:c.id,type:c.type,message:c.message,status:"open"});
+}
+async function syncReviewToDatabase(r){
+  if(!databaseReady()) return;
+  const {data}=await window.surakshaSupabase.auth.getUser(); if(!data?.user) return;
+  await window.surakshaSupabase.from("reviews").insert({user_id:data.user.id,service_id:r.serviceId||null,rating:Number(r.rating),comment:r.comment});
+}
 
 function updateServiceTracker(status){
   const map={"Technician requested":0,"Assigned":1,"On the way":2,"Completed":3};
   const idx=map[status]??0;
   document.querySelectorAll(".status-steps span").forEach((el,i)=>el.classList.toggle("active",i<=idx));
   const text=document.getElementById("serviceStatusText");
-  if(text) text.textContent="Current status: "+status+". Request details are stored in this demo browser.";
+  if(text) text.textContent="Current status: "+status+". Request details are stored in your account database when Supabase is connected.";
 }
 
 function handleInstant(e){
   e.preventDefault();
   const data={type:document.getElementById("instantType").value,device:document.getElementById("instantDevice").value,problem:document.getElementById("instantProblem").value,priority:document.getElementById("instantPriority").value,location:document.getElementById("instantLocation").value,preferredTime:document.getElementById("instantTime").value,id:"SC-FAST-"+String(Date.now()).slice(-6),status:"Technician requested",createdAt:new Date().toISOString()};
   localStorage.setItem("surakshaCareInstant",JSON.stringify(data));
+  syncServiceRequestToDatabase(data);
   closeModal("instantModal");updateServiceTracker(data.status);toast("Technician request created: "+data.id);
   setTimeout(()=>showTicket(data),500);
 }
