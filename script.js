@@ -100,6 +100,13 @@ function showProtectionPlans(){
   }).join('');
   openModal('planModal');
 }
+function confirmProtection(plan,price){
+  const checkups=plan==="Basic"?2:3;
+  const deviceCount=state.devices.filter(d=>d.category&&d.product&&Number(d.value)>0).length;
+  if(!deviceCount){toast("Please add and complete at least one device first.");return;}
+  selectMembership(plan,price,checkups);
+}
+
 function selectMembership(plan,price,checkups){
   state.pendingMembership={plan,price,checkups};
   const terms=document.getElementById("termsAgree");
