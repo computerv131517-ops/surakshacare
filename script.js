@@ -344,6 +344,21 @@ function calculateHealthScore(){
   if(issues==="Yes") score-=15;
   return Math.max(40,Math.min(99,score));
 }
+function renderHealthResult(h){
+  const score=Number(h.score)||0;
+  const scoreEl=document.getElementById("healthScore");
+  if(scoreEl) scoreEl.textContent=score+"%";
+  const label=document.getElementById("healthScoreLabel");
+  if(label) label.textContent="Estimated health score";
+  const name=document.getElementById("healthDeviceName");
+  if(name) name.textContent=h.device||"Your device";
+  const advice=document.getElementById("healthAdvice");
+  if(advice) advice.textContent=score>=85?"Looks in good shape based on your answers. Keep up routine maintenance.":score>=65?"Some maintenance may be due. Arrange a preventive checkup and monitor any recurring symptoms.":"Higher attention recommended. Arrange a technician inspection soon, especially if the device is behaving unusually.";
+  const next=document.getElementById("nextCheckup");
+  if(next) next.textContent=score>=85?"Within 3 months":score>=65?"Within 30 days":"As soon as practical";
+  const action=document.getElementById("healthNextAction");
+  if(action) action.innerHTML=score<65?'<button class="btn btn-outline" onclick="openInstantService()">Request a Technician →</button>':'<button class="btn btn-outline" onclick="openHealthCheck()">Update Assessment</button>';
+}
 document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("healthForm")?.addEventListener("submit",e=>{
     e.preventDefault();
@@ -353,10 +368,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     const issues=document.getElementById("healthIssues").value;
     localStorage.setItem("surakshaCareHealth",JSON.stringify({device,score,usage,issues,date:new Date().toISOString()}));
     syncHealthToDatabase({device,score,usage,issues});
-    document.getElementById("healthScore").textContent=score+"%";
-    document.getElementById("healthDeviceName").textContent=device;
-    document.getElementById("healthAdvice").textContent=score>=85?"Good condition. Continue preventive maintenance.":score>=65?"Needs attention. Consider a preventive checkup soon.":"High attention recommended. Schedule technician support soon.";
-    document.getElementById("nextCheckup").textContent=score>=85?"Within 3 months":"Within 30 days";
+    renderHealthResult({device,score,usage,issues});
     closeModal("healthModal");toast("Health assessment complete: "+score+"% for "+device);
   });
   document.getElementById("complaintForm")?.addEventListener("submit",e=>{
@@ -458,5 +470,5 @@ window.addEventListener("load",()=>{
   const saved=JSON.parse(localStorage.getItem("surakshaCareInstant")||"null");
   if(saved) updateServiceTracker(saved.status||"Technician requested");
   const h=JSON.parse(localStorage.getItem("surakshaCareHealth")||"null");
-  if(h){document.getElementById("healthScore").textContent=h.score+"%";document.getElementById("healthDeviceName").textContent=h.device;document.getElementById("healthAdvice").textContent=h.score>=85?"Good condition. Continue preventive maintenance.":"Needs attention. Consider a preventive checkup soon.";}
+  if(h) renderHealthResult(h);
 });
