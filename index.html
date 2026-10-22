@@ -84,12 +84,14 @@
 </section>
 
 <section class="section" id="protection">
-  <div class="section-head"><div><p class="eyebrow blue">MULTI-DEVICE PROTECTION</p><h2>Protect everything in one place.</h2></div><p>Add multiple appliances or vehicles, review their combined value and get a protection recommendation.</p></div>
+  <div class="section-head"><div><p class="eyebrow blue">MULTI-DEVICE PROTECTION</p><h2>Protect everything in one place.</h2></div><p>Add multiple appliances or vehicles, enter original purchase price and purchase year, and get an estimated current value plus annual plan pricing.</p></div>
   <div class="protection-layout">
     <div class="card">
       <div class="builder-top"><div><h3>Your protected devices</h3><p>Add as many appliances or vehicles as you need.</p></div><button class="btn btn-outline" onclick="addDeviceRow()">+ Add Device</button></div>
+      <p class="pricing-explainer">Enter each device’s original buying price and the year you bought it. SurakshaCare estimates today’s value using an illustrative depreciation rate, then calculates the annual protection fee. This is an estimate, not a resale quote.</p>
       <div id="deviceList"></div>
-      <div class="builder-total"><span><b id="deviceCount">0</b> complete device(s)</span><strong id="totalValue">₹0</strong></div>
+      <div class="builder-total"><span><b id="deviceCount">0</b> complete device(s)</span><strong>Estimated current total: <span id="totalValue">₹0</span></strong></div>
+      <div id="deviceEstimateSummary" class="device-estimate-summary">Add a device and enter its purchase details to see the estimate.</div>
       <button class="btn btn-primary btn-lg full" onclick="reviewDevices()">View Protection Plans →</button>
     </div>
     <aside class="protection-side">
