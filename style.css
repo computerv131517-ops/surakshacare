@@ -100,3 +100,38 @@ footer{background:linear-gradient(115deg,#071426,#10294a)}
 :focus-visible{outline:3px solid rgba(23,105,224,.42);outline-offset:3px}
 @media(max-width:900px){.hero{gap:35px;min-height:auto}.hero-visual{padding:0 8px 12px}.hero-image{height:390px;min-height:390px}.section{padding-top:72px;padding-bottom:72px}}
 @media(max-width:560px){.navbar{height:70px}.logo{font-size:22px}.hero{padding-top:42px;padding-bottom:40px}.hero h1{font-size:clamp(41px,12vw,56px);letter-spacing:-2.4px}.hero-copy>p:not(.eyebrow){font-size:15px}.hero-image{height:290px;min-height:290px;border-width:5px;border-radius:23px}.hero-image:after{border-radius:17px}.emergency-card,.rating-card{left:auto;right:auto;top:auto;bottom:auto;transform:none}.floating-card{align-self:flex-start;margin-top:8px}.rating-card{align-self:flex-end;margin-top:-52px}.quick-strip{padding:13px 5%;flex-wrap:nowrap;justify-content:flex-start}.quick-strip button{white-space:nowrap}.section{padding-top:60px;padding-bottom:60px}.section-head h2{font-size:31px;letter-spacing:-1.2px}.service-card{padding:22px}.plan{padding:24px}.health-card{padding:20px}}
+
+
+/* SurakshaCare homepage refresh v2 — visible layout and contrast improvements */
+:root{--sc-ink:#0b1f3a;--sc-blue:#145bd7}
+body{font-family:Inter,"Segoe UI",Arial,sans-serif;color:#0b1f3a}
+.navbar{padding-left:7%;padding-right:7%;background:#fff;box-shadow:0 5px 24px rgba(15,38,70,.07)}
+.logo{letter-spacing:-.8px}
+.hero{padding:82px 7%;min-height:690px;grid-template-columns:1.02fr .98fr;background:radial-gradient(ellipse at 80% 20%,#cce5ff 0,transparent 32%),linear-gradient(125deg,#f7fbff 0%,#e8f2ff 55%,#f0fcfa 100%)}
+.hero h1{max-width:720px;font-size:clamp(46px,5.3vw,76px);line-height:1.04}
+.hero h1 span{background:linear-gradient(100deg,#155bd7,#079b9b);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero-copy>p:not(.eyebrow){font-size:18px;max-width:570px;color:#425671}
+.hero-image{height:480px;min-height:480px;border:9px solid white;border-radius:34px;box-shadow:0 28px 75px rgba(22,61,111,.22);transform:none}
+.hero-image img{width:100%;height:100%;object-fit:cover;display:block;border-radius:24px}
+.hero-image:after{border-radius:24px}
+.floating-card{padding:15px 18px}
+.quick-strip{padding:18px 7%;background:linear-gradient(100deg,#081a32,#154274)}
+.section{padding-left:7%;padding-right:7%}
+.section-head h2{max-width:720px}
+.service-card,.plan,.card,.role-card{border-radius:22px}
+.plan{padding:32px}
+.plan.popular{border:2px solid #145bd7}
+.btn{border-radius:12px}
+.btn-primary{background:linear-gradient(110deg,#145bd7,#2786ef)}
+.btn-danger{background:linear-gradient(110deg,#d93643,#f06c58)}
+.reviews-layout{display:grid;grid-template-columns:260px 1fr;gap:22px;align-items:start}
+.rating-summary{position:sticky;top:100px}
+.big-rating{font-size:54px;line-height:1.1;font-weight:850;letter-spacing:-2px;color:#123c76}
+.stars{color:#f4a623;font-size:24px;letter-spacing:3px}
+.review-list{min-width:0}
+.empty-reviews{min-height:220px;border:1px dashed #cbd9e9;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px;background:#fff}
+.empty-reviews>span{font-size:34px;margin-bottom:8px}
+.empty-reviews p{color:#6a7889;margin:8px 0 18px}
+.rating-note{display:block;color:#718096;font-size:11px;line-height:1.5;margin-top:14px}
+@media(max-width:900px){.hero{grid-template-columns:1fr;padding:52px 5%;gap:32px}.hero-image{height:400px;min-height:400px}.section{padding-left:5%;padding-right:5%}.reviews-layout{grid-template-columns:1fr}.rating-summary{position:static}}
+@media(max-width:560px){.hero{padding-top:40px;padding-bottom:42px}.hero h1{font-size:clamp(39px,11.5vw,54px)}.hero-image{height:290px;min-height:290px;border-width:5px;border-radius:24px}.hero-image img{border-radius:17px}.hero-image:after{border-radius:17px}.quick-strip{padding:13px 5%}.section{padding-top:58px;padding-bottom:58px}}
