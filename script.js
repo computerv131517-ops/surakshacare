@@ -21,47 +21,84 @@ function openInstantService(){openModal("instantModal");}
 
 function addDeviceRow(){
   const id=Date.now()+Math.random();
-  state.devices.push({id,category:"",product:"",year:"",value:""});
+  state.devices.push({id,category:'',product:'',year:String(new Date().getFullYear()),value:'',currentValue:0,annualFee:0});
   renderDevices();
 }
 function removeDevice(id){state.devices=state.devices.filter(d=>d.id!==id);if(!state.devices.length)addDeviceRow();renderDevices();}
+function money(value){return '₹'+Math.round(Number(value)||0).toLocaleString('en-IN');}
+function deviceAge(year){return Math.max(0,Math.min(40,new Date().getFullYear()-Number(year||new Date().getFullYear())));}
+function depreciationRate(device){
+  if(device.category==='Vehicle'){
+    if(device.product==='Car')return 0.12;
+    if(device.product==='Motorcycle'||device.product==='Scooter')return 0.15;
+    if(device.product==='Electric Vehicle')return 0.14;
+    return 0.13;
+  }
+  return 0.10;
+}
+function estimateCurrentValue(device){
+  const price=Number(device.value)||0;
+  if(!price||!device.year||!device.product)return 0;
+  return Math.round(Math.max(price*0.20,price*Math.pow(1-depreciationRate(device),deviceAge(device.year))));
+}
+function annualFeeForValue(value,plan){
+  let rate,minimum;
+  if(value<5000){rate=0.06;minimum=299;}
+  else if(value<10000){rate=0.05;minimum=399;}
+  else if(value<50000){rate=0.04;minimum=499;}
+  else if(value<100000){rate=0.035;minimum=699;}
+  else{rate=0.03;minimum=999;}
+  const multiplier=plan==='Premium'?1.25:plan==='VIP'?1.5:1;
+  const floor=plan==='Premium'?499:plan==='VIP'?799:minimum;
+  return Math.round(Math.max(floor,value*rate*multiplier));
+}
+function updateDeviceEstimate(device){device.currentValue=estimateCurrentValue(device);device.annualFee=annualFeeForValue(device.currentValue,'Basic');}
 function renderDevices(){
-  const list=document.getElementById("deviceList");
-  list.innerHTML=state.devices.map((d,i)=>`
-    <div class="device-row">
-      <label>Category<select onchange="updateDevice(${d.id},'category',this.value);refreshProducts(${d.id},this.value)"><option value="">Select</option><option ${d.category==="Appliance"?"selected":""}>Appliance</option><option ${d.category==="Vehicle"?"selected":""}>Vehicle</option></select></label>
-      <label>Device<select id="prod-${d.id}" onchange="updateDevice(${d.id},'product',this.value)"><option value="">Select category first</option>${productOptions(d.category,d.product)}</select></label>
-      <label>Approx. value<input type="number" value="${d.value}" placeholder="₹ value" onchange="updateDevice(${d.id},'value',this.value)"></label>
-      <button class="remove-device" onclick="removeDevice(${d.id})">×</button>
-    </div>`).join("");
-  document.getElementById("deviceCount").textContent=state.devices.filter(d=>d.product).length;
-  document.getElementById("totalValue").textContent="₹"+state.devices.reduce((s,d)=>s+(Number(d.value)||0),0).toLocaleString("en-IN");
+  const list=document.getElementById('deviceList');
+  state.devices.forEach(updateDeviceEstimate);
+  list.innerHTML=state.devices.map(d=>
+    '<div class="device-row">'+
+    '<label>Category<select onchange="updateDevice('+d.id+',\'category\',this.value);refreshProducts('+d.id+',this.value)"><option value="">Select</option><option '+(d.category==='Appliance'?'selected':'')+'>Appliance</option><option '+(d.category==='Vehicle'?'selected':'')+'>Vehicle</option></select></label>'+
+    '<label>Device<select id="prod-'+d.id+'" onchange="updateDevice('+d.id+',\'product\',this.value)"><option value="">Select device</option>'+productOptions(d.category,d.product)+'</select></label>'+
+    '<label>Original buying price (₹)<input type="number" min="1" step="100" value="'+(d.value||'')+'" placeholder="e.g. 25000" onchange="updateDevice('+d.id+',\'value\',this.value)"></label>'+
+    '<label>Year bought<select onchange="updateDevice('+d.id+',\'year\',this.value)">'+Array.from({length:new Date().getFullYear()-1985+1},(_,i)=>new Date().getFullYear()-i).map(y=>'<option value="'+y+'" '+(Number(d.year)===y?'selected':'')+'>'+y+'</option>').join('')+'</select></label>'+
+    '<div class="device-mini-estimate"><small>Estimated value now</small><strong>'+(d.currentValue?money(d.currentValue):'—')+'</strong><small>Annual Basic: '+(d.currentValue?money(d.annualFee):'—')+'</small></div>'+
+    '<button class="remove-device" title="Remove device" onclick="removeDevice('+d.id+')">×</button></div>'
+  ).join('');
+  const complete=state.devices.filter(d=>d.category&&d.product&&Number(d.value)>0&&d.year);
+  document.getElementById('deviceCount').textContent=complete.length;
+  const total=complete.reduce((s,d)=>s+d.currentValue,0);
+  document.getElementById('totalValue').textContent=money(total);
+  const summary=document.getElementById('deviceEstimateSummary');
+  if(summary){
+    if(!complete.length)summary.textContent='Complete the device details to see the estimated current value and annual fee.';
+    else summary.innerHTML='Estimated current value across '+complete.length+' device(s): <strong>'+money(total)+'</strong>. Combined Basic annual estimate: <strong>'+money(complete.reduce((s,d)=>s+d.annualFee,0))+'</strong>'+(complete.length>=3?' (10% multi-device discount shown in plan totals).':'.');
+  }
 }
 function productOptions(cat,selected){
-  const arr=cat==="Appliance"?["Refrigerator","Washing Machine","Air Conditioner","Television","Microwave","Water Purifier","Geyser","Other Appliance"]:cat==="Vehicle"?["Car","Motorcycle","Scooter","Electric Vehicle","Other Vehicle"]:[];
-  return arr.map(x=>`<option ${x===selected?"selected":""}>${x}</option>`).join("");
+  const arr=cat==='Appliance'?['Refrigerator','Washing Machine','Air Conditioner','Television','Microwave','Water Purifier','Geyser','Other Appliance']:cat==='Vehicle'?['Car','Motorcycle','Scooter','Electric Vehicle','Other Vehicle']:[];
+  return arr.map(x=>'<option value="'+x+'" '+(x===selected?'selected':'')+'>'+x+'</option>').join('');
 }
-function refreshProducts(id,cat){const d=state.devices.find(x=>x.id===id);if(d){d.product="";d.category=cat;renderDevices();}}
-function updateDevice(id,key,value){const d=state.devices.find(x=>x.id===id);if(d)d[key]=value;document.getElementById("deviceCount").textContent=state.devices.filter(d=>d.product).length;document.getElementById("totalValue").textContent="₹"+state.devices.reduce((s,d)=>s+(Number(d.value)||0),0).toLocaleString("en-IN");}
+function refreshProducts(id,cat){const d=state.devices.find(x=>x.id===id);if(d){d.product='';d.category=cat;renderDevices();}}
+function updateDevice(id,key,value){const d=state.devices.find(x=>x.id===id);if(d)d[key]=value;renderDevices();}
 function reviewDevices(){
-  const valid=state.devices.filter(d=>d.category&&d.product&&Number(d.value)>0);
-  if(!valid.length){toast("Please add at least one complete device.");return;}
+  const valid=state.devices.filter(d=>d.category&&d.product&&Number(d.value)>0&&Number(d.year)>0);
+  if(!valid.length){toast('Please complete category, device, buying price and purchase year.');return;}
   state.devices=valid;showProtectionPlans();
 }
 function showProtectionPlans(){
-  const total=state.devices.reduce((s,d)=>s+Number(d.value),0);
-  document.getElementById("planChoices").innerHTML=[
-    ["Basic",Math.max(999,Math.round(total*.012)), "2 checkups/year • standard support"],
-    ["Premium",Math.max(1999,Math.round(total*.02)), "3 checkups/year • priority technician"],
-    ["VIP",Math.max(2999,Math.round(total*.03)), "3 checkups/year • fastest support"]
-  ].map(p=>`<div class="plan-choice"><div><b>${p[0]}</b><small style="display:block;color:#718096">${p[2]}</small></div><div><strong>₹${p[1].toLocaleString("en-IN")}/yr</strong> <button class="btn btn-primary" onclick="confirmProtection('${p[0]}',${p[1]})">Select</button></div></div>`).join("");
-  openModal("planModal");
-}
-function confirmProtection(plan,price){
-  localStorage.setItem("surakshaCareProtection",JSON.stringify({devices:state.devices,plan,price,date:new Date().toISOString()}));
-  closeModal("planModal");
-  toast(`${plan} protection selected. Continue with login to activate.`);
-  setTimeout(()=>openModal("signupModal"),500);
+  state.devices.forEach(updateDeviceEstimate);
+  const complete=state.devices.filter(d=>d.currentValue>0);
+  const totalCurrent=complete.reduce((s,d)=>s+d.currentValue,0);
+  const plans=[{name:'Basic',checkups:'2 checkups/year • standard support'},{name:'Premium',checkups:'3 checkups/year • priority technician'},{name:'VIP',checkups:'3 checkups/year • fastest support'}];
+  const breakdown=complete.map(d=>'<div class="estimate-line"><span>'+escapeHtml(d.product)+' ('+deviceAge(d.year)+' yr old)<small>Bought for '+money(d.value)+' · estimated current value '+money(d.currentValue)+'</small></span><strong>'+money(d.annualFee)+'/yr</strong></div>').join('');
+  document.getElementById('planChoices').innerHTML='<div class="pricing-note"><b>How the estimate is calculated</b><p>Estimated current value = original buying price × (1 − annual depreciation rate)<sup>device age</sup>, with a 20% minimum residual value. Appliance depreciation: 10%/year; car: 12%; motorcycle/scooter: 15%; electric vehicle: 14%. These are illustrative planning assumptions.</p><p class="pricing-bands">Basic annual fee per device: below ₹5,000: 6% (min ₹299) · ₹5,000–₹9,999: 5% (min ₹399) · ₹10,000–₹49,999: 4% (min ₹499) · ₹50,000–₹99,999: 3.5% (min ₹699) · ₹1,00,000+: 3% (min ₹999). Premium = 1.25× Basic rate; VIP = 1.5× Basic rate. Three or more devices get 10% off the combined fee.</p><p><b>Estimated current value of all devices:</b> '+money(totalCurrent)+'</p></div><div class="estimate-breakdown">'+breakdown+'</div>'+plans.map(p=>{
+    const raw=complete.reduce((s,d)=>s+annualFeeForValue(d.currentValue,p.name),0);
+    const discount=complete.length>=3?Math.round(raw*0.10):0;
+    const total=Math.max(0,raw-discount);
+    return '<div class="plan-choice"><div><b>'+p.name+'</b><small style="display:block;color:#718096">'+p.checkups+'</small><small style="display:block;color:#718096">'+complete.length+' device(s) · '+(complete.length>=3?'10% multi-device discount included':'Add 3+ devices for 10% off')+'</small></div><div style="text-align:right"><strong>'+money(total)+'/yr</strong>'+(discount?'<small style="display:block;color:#13804a">You save '+money(discount)+'</small>':'')+'<button class="btn btn-primary" onclick="confirmProtection(\''+p.name+'\','+total+')">Select</button></div></div>';
+  }).join('');
+  openModal('planModal');
 }
 function selectMembership(plan,price,checkups){
   state.pendingMembership={plan,price,checkups};
