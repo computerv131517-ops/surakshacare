@@ -47,7 +47,7 @@ function annualFeeForValue(value,plan){
   else if(value<10000){rate=0.05;minimum=399;}
   else if(value<50000){rate=0.04;minimum=499;}
   else if(value<100000){rate=0.035;minimum=699;}
-  else{rate=0.03;minimum=999;}
+  else{rate=0.025;minimum=2500;}
   const multiplier=plan==='Premium'?1.25:plan==='VIP'?1.5:1;
   const floor=plan==='Premium'?499:plan==='VIP'?799:minimum;
   return Math.round(Math.max(floor,value*rate*multiplier));
@@ -92,7 +92,7 @@ function showProtectionPlans(){
   const totalCurrent=complete.reduce((s,d)=>s+d.currentValue,0);
   const plans=[{name:'Basic',checkups:'2 checkups/year • standard support'},{name:'Premium',checkups:'3 checkups/year • priority technician'},{name:'VIP',checkups:'3 checkups/year • fastest support'}];
   const breakdown=complete.map(d=>'<div class="estimate-line"><span>'+escapeHtml(d.product)+' ('+deviceAge(d.year)+' yr old)<small>Bought for '+money(d.value)+' · estimated current value '+money(d.currentValue)+'</small></span><strong>'+money(d.annualFee)+'/yr</strong></div>').join('');
-  document.getElementById('planChoices').innerHTML='<div class="pricing-note"><b>How the estimate is calculated</b><p>Estimated current value = original buying price × (1 − annual depreciation rate)<sup>device age</sup>, with a 20% minimum residual value. Appliance depreciation: 10%/year; car: 12%; motorcycle/scooter: 15%; electric vehicle: 14%. These are illustrative planning assumptions.</p><p class="pricing-bands">Basic annual fee per device: below ₹5,000: 6% (min ₹299) · ₹5,000–₹9,999: 5% (min ₹399) · ₹10,000–₹49,999: 4% (min ₹499) · ₹50,000–₹99,999: 3.5% (min ₹699) · ₹1,00,000+: 3% (min ₹999). Premium = 1.25× Basic rate; VIP = 1.5× Basic rate. Three or more devices get 10% off the combined fee.</p><p><b>Estimated current value of all devices:</b> '+money(totalCurrent)+'</p></div><div class="estimate-breakdown">'+breakdown+'</div>'+plans.map(p=>{
+  document.getElementById('planChoices').innerHTML='<div class="pricing-note"><b>How the estimate is calculated</b><p>Estimated current value = original buying price × (1 − annual depreciation rate)<sup>device age</sup>, with a 20% minimum residual value. Appliance depreciation: 10%/year; car: 12%; motorcycle/scooter: 15%; electric vehicle: 14%. These are illustrative planning assumptions.</p><p class="pricing-bands">Basic annual fee per device: below ₹5,000: 6% (min ₹299) · ₹5,000–₹9,999: 5% (min ₹399) · ₹10,000–₹49,999: 4% (min ₹499) · ₹50,000–₹99,999: 3.5% (min ₹699) · ₹1,00,000+: 2.5% (min ₹2,500). Premium = 1.25× Basic rate; VIP = 1.5× Basic rate. Three or more devices get 10% off the combined fee.</p><p><b>Estimated current value of all devices:</b> '+money(totalCurrent)+'</p></div><div class="estimate-breakdown">'+breakdown+'</div>'+plans.map(p=>{
     const raw=complete.reduce((s,d)=>s+annualFeeForValue(d.currentValue,p.name),0);
     const discount=complete.length>=3?Math.round(raw*0.10):0;
     const total=Math.max(0,raw-discount);
