@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("instantForm").addEventListener("submit",handleInstant);
   document.getElementById("signupRole")?.addEventListener("change",toggleTechnicianFields);
   toggleTechnicianFields();
+  initAuthProfileUI();
 });
 
 function scrollToId(id){document.getElementById(id)?.scrollIntoView({behavior:"smooth"});}
@@ -126,6 +127,8 @@ async function handleSignup(e){
   localStorage.setItem("surakshaCareRole",role==="technician"?"Technician":"Customer");
   closeModal("signupModal");
   if(data.session){
+    const createdUser={name,email,mobile,role,skills};
+    renderAccountNav(createdUser);
     toast("Account created and signed in successfully.");
     setTimeout(()=>role==="technician"?showTechnicianDashboard():showCustomerDashboard(),500);
   }else{
@@ -161,6 +164,7 @@ async function handleLogin(e){
   };
   localStorage.setItem("surakshaCareUser",JSON.stringify(userRecord));
   localStorage.setItem("surakshaCareRole",actualLabel);
+  renderAccountNav(userRecord);
   closeModal("loginModal");
   toast("Welcome back, "+(userRecord.name||actualLabel)+"!");
   setTimeout(()=>actualRole==="technician"?showTechnicianDashboard():showCustomerDashboard(),350);
@@ -204,6 +208,79 @@ function handleInstant(e){
 function showTicket(d){
   document.body.insertAdjacentHTML("beforeend",`<div class="modal show" id="ticketModal"><div class="modal-box"><button class="close" onclick="closeModal('ticketModal')">×</button><div class="modal-icon danger">⚡</div><h2>Request received</h2><p>Your instant technician request has been created.</p><div class="instant-summary"><b>${d.id}</b><br>${d.device} • ${d.type}<br><small>${d.location}</small></div><div class="benefit-card"><span>🔎</span><div><b>Finding an available technician</b><small>Demo status — dispatch will appear here in the live backend.</small></div></div><button class="btn btn-primary full" onclick="closeModal('ticketModal')">Done</button></div></div>`);
 }
+function initAuthProfileUI(){
+  // Show the account control after a previous Supabase session is restored.
+  if(!databaseReady()) return;
+  window.surakshaSupabase.auth.getSession().then(async ({data,error})=>{
+    if(error || !data?.session?.user) return;
+    const user=data.session.user;
+    const meta=user.user_metadata||{};
+    let profile=null;
+    const result=await window.surakshaSupabase.from("profiles").select("*").eq("id",user.id).maybeSingle();
+    if(!result.error) profile=result.data;
+    const role=(profile?.role||meta.role||"customer").toLowerCase();
+    const record={
+      id:user.id,
+      name:profile?.full_name||meta.full_name||user.email||"Customer",
+      email:user.email||"",
+      mobile:profile?.mobile||meta.mobile||"",
+      role,
+      skills:profile?.skills||meta.skills||""
+    };
+    localStorage.setItem("surakshaCareUser",JSON.stringify(record));
+    localStorage.setItem("surakshaCareRole",role==="technician"?"Technician":"Customer");
+    renderAccountNav(record);
+  });
+}
+
+function renderAccountNav(user){
+  const actions=document.querySelector(".nav-actions");
+  if(!actions) return;
+  let account=document.getElementById("surakshaAccountNav");
+  if(!account){
+    account=document.createElement("div");
+    account.id="surakshaAccountNav";
+    account.style.cssText="display:flex;align-items:center;gap:9px;";
+    actions.appendChild(account);
+  }
+  const name=(user?.name||user?.email||"My Profile").toString();
+  const initials=name.trim().split(/\\s+/).slice(0,2).map(x=>x[0]||"").join("").toUpperCase()||"U";
+  actions.querySelectorAll("button").forEach(button=>{ if(button.id!=="surakshaLogoutBtn") button.style.display="none"; });
+  account.innerHTML=
+    '<button class="btn btn-ghost" type="button" onclick="openMyDashboard()" style="display:flex;align-items:center;gap:8px;">'+
+    '<span style="width:30px;height:30px;border-radius:50%;background:#1769e0;color:white;display:inline-grid;place-items:center;font-weight:800;">'+initials+'</span>'+
+    '<span style="text-align:left"><span style="display:block;font-size:12px;color:#64748b">My Profile</span><strong style="display:block;max-width:125px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeAccountText(name)+'</strong></span></button>'+
+    '<button id="surakshaLogoutBtn" class="btn btn-outline" type="button" onclick="logoutSurakshaCare()">Logout</button>';
+  account.style.display="flex";
+}
+
+function escapeAccountText(value){
+  return String(value||"").replace(/[&<>"']/g,character=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[character]));
+}
+
+function openMyDashboard(){
+  const user=JSON.parse(localStorage.getItem("surakshaCareUser")||"{}");
+  const role=String(user.role||localStorage.getItem("surakshaCareRole")||"customer").toLowerCase();
+  document.getElementById("dashModal")?.remove();
+  if(role==="technician") showTechnicianDashboard();
+  else if(role==="admin") showAdminDashboard();
+  else showCustomerDashboard();
+}
+
+async function logoutSurakshaCare(){
+  if(databaseReady()){
+    const {error}=await window.surakshaSupabase.auth.signOut();
+    if(error){toast(error.message||"Could not sign out.");return;}
+  }
+  localStorage.removeItem("surakshaCareUser");
+  localStorage.removeItem("surakshaCareRole");
+  document.getElementById("dashModal")?.remove();
+  const account=document.getElementById("surakshaAccountNav");
+  account?.remove();
+  document.querySelectorAll(".nav-actions button").forEach(button=>button.style.display="");
+  toast("You have been logged out.");
+}
+
 function dashboardShell(title,subtitle,items){
   document.body.insertAdjacentHTML("beforeend",`<div class="modal show" id="dashModal"><div class="modal-box wide"><button class="close" onclick="closeModal('dashModal')">×</button><div class="eyebrow blue">SURAKSHACARE DASHBOARD</div><h2>${title}</h2><p>${subtitle}</p><div class="dashboard-items">${items.map(x=>`<div class="benefit-card"><span>${x[0]}</span><div><b>${x[1]}</b><small>${x[2]}</small></div></div>`).join("")}</div></div></div>`);
 }
